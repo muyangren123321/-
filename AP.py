@@ -17,14 +17,14 @@ model = Model('Assignment_Problem')
 x = [[[] for i in range(employee_num)] for j in range(job_num)]
 for i in range(employee_num):
     for j in range(job_num):
-        x[i][j] = model.addVar(vtype=GRB.BINARY, name="x_" + str(i) + "_" + str(j))
+        x[i][j] = model.addVar(lb=0,ub=1,vtype=GRB.CONTINUOUS,name="x_"+str(i)+"_"+str(j))
 # 目标函数
 obj = LinExpr(0)
 for i in range(employee_num):
     for j in range(job_num):
         obj.addTerms(cost_matrix[i][j], x[i][j])
 
-model.setObjective(obj, GRB.MAXIMIZE)
+model.setObjective(obj, GRB.MINIMIZE)
 
 # 约束条件1
 for j in range(employee_num):
