@@ -1,0 +1,79 @@
+# -*- coding: utf-8 -*-
+"""
+@author: zhangjian
+"""
+
+from gurobipy import *
+
+TypesDemand = [3, 7, 9, 16]  # 需求长度
+QuantityDemand = [25, 30, 14, 8]  # 需求的量
+LengthUsable = 20  # 钢管长度
+try:
+    MainProbRelax = Model()  # 松弛后的列生成主问题
+    SubProb = Model()  # 子问题
+
+    # 构造主问题模型，选择的初始切割方案 每根钢管只切一种长度 
+    # 添加变量
+    Zp = MainProbRelax.addVars(len(TypesDemand), obj=1.0, vtype=GRB.CONTINUOUS, name='z')
+    # 添加约束    
+    ColumnIndex = MainProbRelax.addConstrs(quicksum(Zp[p] * (LengthUsable // TypesDemand[i]) \
+                                                    for p in range(len(TypesDemand)) if p == i) >= QuantityDemand[i] for
+                                           i in range(len(TypesDemand)))
+    MainProbRelax.optimize()  # 求解，默认优化方向为最小化
+
+    # 构造子问题模型
+    # 获得对偶值
+    Dualsolution = MainProbRelax.getAttr(GRB.Attr.Pi, MainProbRelax.getConstrs())
+
+    # GRB.Attr.Pi 是一个属性，用于获取或设置优化问题的对偶价格。它只适用于连续模型，而且变量类型不能是二进制的。
+    # MainProbRelax.getConstrs() 是一个方法，用于获取优化问题的所有线性约束。它返回一个列表，包含模型中的每个约束对象
+
+    # 添加变量，键：【0-4】；值：Dualsolution；类型：连续变量；名称：c
+    Ci = SubProb.addVars(len(TypesDemand), obj=Dualsolution, vtype=GRB.INTEGER, name='c')
+    # 添加约束
+    SubProb.addConstr(quicksum(Ci[i] * TypesDemand[i] for i in range(len(TypesDemand))) <= LengthUsable)
+    SubProb.setAttr(GRB.Attr.ModelSense, -1)  # 设定优化方向，ModelSense 是一个属性，用于指定优化问题的目标函数是最小化还是最大化，-1表示最大化
+    SubProb.optimize()  # 求解，max SubProb.objval
+
+    # 判断Reduced Cost是否小于零，𝑚in 1 −SubProb.objval
+    while SubProb.objval > 1:
+        # 获取变量取值
+        columnCoeff = SubProb.getAttr("X", SubProb.getVars())
+        column = Column(columnCoeff, MainProbRelax.getConstrs())
+
+        # 第一行使用 Gurobi 库中的 getAttr 方法获取 SubProb 中变量的值。"X" 属性指定应检索这些变量的解决方案值。
+        # 第二行使用这些值和来自 MainProbRelax 的约束创建新的列对象。
+        # 在列生成算法中，列对象表示主问题的一个变量及其对应的约束系数。它是一种用于将新变量添加到主问题中的数据结构。
+        # Column(columnCoeff, MainProbRelax.getConstrs()) 这一行创建了一个新的列对象。
+        # 其中 columnCoeff 是一个数组，表示新变量在每个约束中的系数，而 MainProbRelax.getConstrs() 返回主问题松弛中的所有约束。
+        # 在列生成算法中，当向主问题添加新变量时，需要指定该变量在每个约束中的系数。因此，在创建新的列对象时，需要提供主问题松弛中所有约束的信息。
+        # MainProbRelax.getConstrs() 返回主问题松弛中的所有约束。这些约束与 columnCoeff 数组一起用于创建新的列对象，指定新变量在每个约束中的系数。
+
+        # 添加变量
+        MainProbRelax.addVar(obj=1.0, vtype=GRB.CONTINUOUS, name="CG", column=column)
+        # 向名为MainProbRelax的模型中添加一个新变量。
+        # 该变量的目标系数为1.0，类型为连续（GRB.CONTINUOUS），名称为“CG”，并且使用了一个名为column的列对象来指定其约束系数。
+        MainProbRelax.optimize()  # 求解松弛后的主问题
+
+        # 修改子问题目标函数系数
+        for i in range(len(TypesDemand)):
+            Ci[i].obj = ColumnIndex[i].pi  # 用于设置第 i 个变量的目标函数系数为第 i 个列的对偶价格
+            # 在 Gurobi 中，ColumnIndex 是一个属性，它返回一个整数，表示变量在模型中的列索引
+        SubProb.optimize()
+
+    # 将CG后的模型转为整数，并求解
+    for v in MainProbRelax.getVars():
+        v.setAttr("VType", GRB.INTEGER)
+        # 遍历了一个名为MainProbRelax的模型中的所有变量，并将每个变量的类型设置为整数（GRB.INTEGER）。意味着在求解过程中，这些变量只能取整数值。
+    MainProbRelax.optimize()
+    for v in MainProbRelax.getVars():
+        if v.X != 0.0:
+            print('%s %g' % (v.VarName, v.X))
+            # 遍历了一个名为MainProbRelax的模型中的所有变量，并检查每个变量的值（通过访问其X属性）。
+            # 如果变量的值不为零，则打印该变量的名称（通过访问其VarName属性）和值。
+
+except GurobiError as e:
+    print('Error code ' + str(e.errno) + ": " + str(e))
+
+except AttributeError:
+    print('Encountered an attribute error')
