@@ -1,0 +1,158 @@
+#  -*-coding:utf8 -*-
+from gurobipy import *
+from itertools import chain
+
+def rmp(a, c):
+    dualArray = []
+    try:
+        # Create a new model
+        m = Model("mip1")
+        # Create variables
+        x = [m.addVar(name='x{name}'.format(name=index)) for index in range(len(a))]
+        # Set objective
+        m.setObjective(quicksum(list(chain(
+            *[[xi * (ci if indexx == indexc else 0) for indexx, xi in enumerate(x)] for indexc, ci in enumerate(c)]))),
+            GRB.MINIMIZE)
+
+        m.addConstr(quicksum(list(chain(
+            *[[xi * (ai[0] if indexx == indexa else 0) for indexx, xi in enumerate(x)] for indexa, ai in
+              enumerate(a)]))) >= 30, name="c0")
+        m.addConstr(quicksum(list(chain(
+            *[[xi * (ai[1] if indexx == indexa else 0) for indexx, xi in enumerate(x)] for indexa, ai in
+              enumerate(a)]))) >= 20, name="c1")
+        m.addConstr(quicksum(list(chain(
+            *[[xi * (ai[2] if indexx == indexa else 0) for indexx, xi in enumerate(x)] for indexa, ai in
+              enumerate(a)]))) >= 40, name="c2")
+        m.update()
+        m.optimize()
+        #
+        con = m.getConstrs()
+        for v in m.getVars():
+            print('%s = %g' % (v.varName, v.x))
+        for i in range(m.getAttr(GRB.Attr.NumConstrs)):
+            dualArray.append(con[i].getAttr(GRB.Attr.Pi))  # GRB.Attr.SlackGRB.Attr.Pi
+        print('Obj: %g' % m.objVal)
+        print('pi:', dualArray)
+        r = subp1(dualArray)
+        b = subp2(dualArray)
+        n = subp3(dualArray)
+        maxreduce = max(r[0], b[0], n[0])
+        aj = []
+        cj = 0
+        if maxreduce > 0:
+            if maxreduce == r[0]:
+                aj = r[1]
+                cj = 5
+            if maxreduce == b[0]:
+                aj = b[1]
+                cj = 9
+            if maxreduce == n[0]:
+                aj = n[1]
+                cj = 10
+            print(maxreduce, aj)
+
+        else:
+            print('切的方式')
+            print(a)
+            print('每种方式的个数')
+            for v in m.getVars():
+                print('%s = %g' % (v.varName, v.x))
+            print('总价格')
+            print('Obj: %g' % m.objVal)
+            return a, aj
+        a.append(aj)
+        c.append(cj)
+        rmp(a, c)
+    except GurobiError as e:
+        print('Error code ' + str(e.errno) + ": " + str(e))
+
+    except AttributeError:
+        print('master Encountered an attribute error')
+
+def subp1(w):
+    dualArray = []
+    try:
+        # Create a new model
+        m = Model("sip1")
+        # Create variables
+        x1 = m.addVar(lb=0.0, vtype=GRB.INTEGER, name="m1")
+        x2 = m.addVar(lb=0.0, vtype=GRB.INTEGER, name="m2")
+        x3 = m.addVar(lb=0.0, vtype=GRB.INTEGER, name="m3")
+        # Set objective
+        m.setObjective(w[0] * x1 + w[1] * x2 + w[2] * x3 - 5, GRB.MAXIMIZE)
+        m.addConstr(4 * x1 + 5 * x2 + 7 * x3 <= 9, "c0")
+        m.optimize()
+        c = m.getConstrs()
+        for v in m.getVars():
+            print('sub1: %s = %g' % (v.varName, v.x))
+            dualArray.append(v.x)
+        print('sub1: Obj: %g' % m.objVal)
+        return m.objVal, dualArray
+    except GurobiError as e:
+        print('Error code ' + str(e.errno) + ": " + str(e))
+
+    except AttributeError:
+        print('sub1 Encountered an attribute error')
+
+def subp2(w):
+    dualArray = []
+    try:
+        # Create a new model
+        m = Model("sip2")
+        # Create variables
+        x1 = m.addVar(lb=0.0, vtype=GRB.INTEGER, name="m1")
+        x2 = m.addVar(lb=0.0, vtype=GRB.INTEGER, name="m2")
+        x3 = m.addVar(lb=0.0, vtype=GRB.INTEGER, name="m3")
+        # Set objective
+        m.setObjective(w[0] * x1 + w[1] * x2 + w[2] * x3 - 9, GRB.MAXIMIZE)
+        m.addConstr(4 * x1 + 5 * x2 + 7 * x3 <= 14, "c0")
+        m.optimize()
+        c = m.getConstrs()
+        for v in m.getVars():
+            print('sub2: %s = %g' % (v.varName, v.x))
+            dualArray.append(v.x)
+        print('sub2: Obj: %g' % m.objVal)
+        return m.objVal, dualArray
+
+    except GurobiError as e:
+        print('Error code ' + str(e.errno) + ": " + str(e))
+
+    except AttributeError:
+        print('sub2 Encountered an attribute error')
+
+def subp3(w):
+    dualArray = []
+    try:
+        # Create a new model
+        m = Model("sip3")
+        # Create variables
+        x1 = m.addVar(lb=0.0, vtype=GRB.INTEGER, name="m1")
+        x2 = m.addVar(lb=0.0, vtype=GRB.INTEGER, name="m2")
+        x3 = m.addVar(lb=0.0, vtype=GRB.INTEGER, name="m3")
+        # Set objective
+        m.setObjective(w[0] * x1 + w[1] * x2 + w[2] * x3 - 10, GRB.MAXIMIZE)
+        m.addConstr(4 * x1 + 5 * x2 + 7 * x3 <= 16, "c0")
+        m.optimize()
+        c = m.getConstrs()
+        for v in m.getVars():
+            print('sub3: %s = %g' % (v.varName, v.x))
+            dualArray.append(v.x)
+        print('sub3: Obj: %g' % m.objVal)
+        return m.objVal, dualArray
+
+    except GurobiError as e:
+        print('Error code ' + str(e.errno) + ": " + str(e))
+
+    except AttributeError:
+        print('sub3 Encountered an attribute error')
+if __name__ == '__main__':
+    a1 = [2, 0, 0]
+    a2 = [1, 1, 0]
+    a3 = [0, 0, 1]
+
+    a = []
+    a.append(a1)
+    a.append(a2)
+    a.append(a3)
+    c = [5, 5, 5]
+    rmp(a, c)
