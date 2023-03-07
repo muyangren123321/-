@@ -19,10 +19,11 @@ try:
     ColumnIndex = MainProbRelax.addConstrs(quicksum(Zp[p] * (LengthUsable // TypesDemand[i]) \
                                                     for p in range(len(TypesDemand)) if p == i) >= QuantityDemand[i] for
                                            i in range(len(TypesDemand)))
-    MainProbRelax.optimize()  # 求解，默认优化方向为最小化
+    MainProbRelax.optimize()  # 求解，默认优化方向为最小化，不添加目标函数，Gurobi会自动使用0作为目标函数，也就是模型会在满足约束条件的情况下最小化0。
 
     # 构造子问题模型
     # 获得对偶值
+    
     Dualsolution = MainProbRelax.getAttr(GRB.Attr.Pi, MainProbRelax.getConstrs())
 
     # GRB.Attr.Pi 是一个属性，用于获取或设置优化问题的对偶价格。它只适用于连续模型，而且变量类型不能是二进制的。
@@ -35,7 +36,7 @@ try:
     SubProb.setAttr(GRB.Attr.ModelSense, -1)  # 设定优化方向，ModelSense 是一个属性，用于指定优化问题的目标函数是最小化还是最大化，-1表示最大化
     SubProb.optimize()  # 求解，max SubProb.objval
 
-    # 判断Reduced Cost是否小于零，𝑚in 1 −SubProb.objval
+    # 判断Reduced Cost是否小于零，目标函数为𝑚in 1 −SubProb.objval
     while SubProb.objval > 1:
         # 获取变量取值
         columnCoeff = SubProb.getAttr("X", SubProb.getVars())
