@@ -15,7 +15,7 @@ try:
     # 构造主问题模型，选择的初始切割方案 每根钢管只切一种长度 
     # 添加变量，键为TypeDemand的长度，系数为一，类型为连续变量，名称为Z
     Zp = MainProbRelax.addVars(len(TypesDemand), obj=1.0, vtype=GRB.CONTINUOUS, name='z')
-    # 添加约束    
+    # 添加约束，即只生成一块板上只切割一种毛坯的约束条件    
     ColumnIndex = MainProbRelax.addConstrs(quicksum(Zp[p] * (LengthUsable // TypesDemand[i]) \
                                                     for p in range(len(TypesDemand)) if p == i) >= QuantityDemand[i] for
                                            i in range(len(TypesDemand)))
