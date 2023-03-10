@@ -1,0 +1,67 @@
+import math
+
+
+# 将板材剪切成同形段
+def cut_into_segments(width, height, segment_width):
+    num_segments = math.ceil(width / segment_width)
+    segment_height = height
+    return num_segments, segment_width, segment_height
+
+
+# 将同形段剪切成同形级
+def cut_into_tiers(segment_width, segment_height, tier_height):
+    num_tiers = math.ceil(segment_height / tier_height)
+    tier_width = segment_width
+    return num_tiers, tier_width, tier_height
+
+
+# 将同形级剪切成同形块
+def cut_into_blocks(tier_width, tier_height, block_width, block_height):
+    num_blocks_w = math.floor(tier_width / block_width)
+    num_blocks_h = math.floor(tier_height / block_height)
+    return num_blocks_w, num_blocks_h
+
+
+# 获取指定尺寸矩形的数量
+def get_rectangles(width, height, num_segments, num_tiers, num_blocks_w, num_blocks_h, block_width, block_height):
+    num_rectangles = num_segments * num_tiers * num_blocks_w * num_blocks_h
+    num_rectangles //= (width // block_width) * (height // block_height)
+    return num_rectangles
+
+
+# 例子
+width = 500
+height = 300
+segment_width = 100
+tier_height = 50
+block_width = 10
+block_height = 20
+
+# 将板材剪切成同形段
+num_segments, segment_width, segment_height = cut_into_segments(width, height, segment_width)
+
+# 将同形段剪切成同形级
+num_tiers, tier_width, tier_height = cut_into_tiers(segment_width, segment_height, tier_height)
+
+# 将同形级剪切成同形块
+num_blocks_w, num_blocks_h = cut_into_blocks(tier_width, tier_height, block_width, block_height)
+
+# 计算板材总面积
+total_area = width * height
+
+# 统计不同尺寸矩形的数量
+x = {}
+for w in range(block_width, tier_width + 1, block_width):
+    for h in range(block_height, tier_height + 1, block_height):
+        # 获取指定尺寸矩形的数量
+        num_rectangles = get_rectangles(w, h, num_segments, num_tiers, num_blocks_w, num_blocks_h, block_width,
+                                        block_height)
+        # 计算该尺寸矩形的总面积
+        area = w * h * num_rectangles
+        # 判断总面积是否超过板材面积
+        if area <= total_area:
+            x[(w, h)] = num_rectangles
+
+# 输出不同尺寸矩形的数量
+for size, x in x.items():
+    print(f"Number of {size} rectangles: {x}")
