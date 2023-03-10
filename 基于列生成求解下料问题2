@@ -1,0 +1,198 @@
+# -*- coding: utf-8 -*-
+import gurobipy as gb
+import pandas as pd
+import numpy as np
+
+
+# =============================================================================
+class MasterProblem:
+    def __init__(self, patternDf, inputDf):
+        self.patternCost = patternDf['PatternCost'].values
+        self.pattern = patternDf['PatternFill'].values
+        self.amount = inputDf['Amount'].values
+        self.model = gb.Model("MasterProblem")
+        self.patternsIndex = patternDf.index.values
+
+    def buildModel(self):
+        self.generateVariables()
+        self.generateConstraints()
+        self.generateObjective()
+        self.model.update()
+
+    def generateVariables(self):
+        # PatternUseVar (p) € [0, total Amount]: Number of times the pattern 'p' is used in the solution.
+        self.patternUseVar = self.model.addVars(self.patternsIndex, lb=0, ub=sum(self.amount), vtype=gb.GRB.INTEGER,
+                                                name="PatternUseVar")
+
+    def generateConstraints(self):
+        # It must be cutted, at least as many pieces as specified in the input data
+        for i in range(len(self.patternsIndex)):
+            self.model.addConstr(gb.quicksum(self.pattern[p][i] * self.patternUseVar[p] for p in self.patternsIndex) >=
+                                 self.amount[i], 'C' + str(i))
+
+    def generateObjective(self):
+        # Minimize the total cost of the used rolls
+        self.model.setObjective(gb.quicksum(self.patternUseVar[p] * self.patternCost[p] for p in self.patternsIndex),
+                                sense=gb.GRB.MINIMIZE)
+
+    def solveRelaxedModel(self):
+        # Relaxed integer variables to continuous variables
+        self.relaxedModel = self.model.relax()
+        self.relaxedModel.optimize()
+
+    def getDuals(self):
+        return self.relaxedModel.getAttr("Pi", self.model.getConstrs())
+
+    def addColumn(self, objective, newPattern):
+        ctName = ('PatternUseVar[%s]' % len(self.model.getVars()))
+        newColumn = gb.Column(newPattern, self.model.getConstrs())
+        patternDf.loc[len(patternDf.index)] = [1, [int(abs(x)) for x in newPattern]]
+        self.model.addVar(vtype=gb.GRB.INTEGER, lb=0, obj=objective, column=newColumn, name=ctName)
+        self.model.update()
+
+    def solveModel(self, timelimit=None, GAP=0.0):
+        self.model.setParam('TimeLimit', timelimit)
+        self.model.setParam('MIPGap', GAP)
+        self.model.optimize()
+
+    def result(self):
+        for idx, v in enumerate(self.model.getVars()):
+            if v.X != 0:
+                keys = ["piece size " + str(i) for i in inputDf['Size']]
+                values = patternDf.iloc[idx, 1]
+                dictionary = dict(zip(keys, values))
+                print(f"The pattern {dictionary} is used {int(v.X)} times.")
+
+
+# =============================================================================
+
+# =============================================================================
+class Subproblem:
+    def __init__(self, inputDf, originalBoardSize, duals):
+        self.patternCost = patternDf['PatternCost'].values
+        self.pattern = patternDf['PatternFill'].values
+        self.amount = inputDf['Amount'].values
+        self.pieceSize = inputDf['Size'].values
+        self.originalBoardSize = originalBoardSize
+        self.duals = duals
+        self.model = gb.Model('Subproblem')
+        self.piecesIndex = inputDf.index.values
+
+    def buildModel(self):
+        self.generateVariables()
+        self.generateConstraints()
+        self.generateObjective()
+        self.model.update()
+
+    def generateVariables(self):
+        # PiecesInPatternVar(p) € [0, amount(piece)]: Number of times the piece
+        # p is cutted in the new pattern
+        self.piecesInPatternVar = self.model.addVars(self.piecesIndex, lb=0,
+                                                     ub=self.amount,
+                                                     vtype=gb.GRB.INTEGER,
+                                                     name='PiecesInPatternsVar')
+
+    def generateConstraints(self):
+        # The size of the raw Roll limits the pieces that van be cutted
+        self.model.addLConstr(gb.quicksum(self.piecesInPatternVar[p] * self.pieceSize[p]
+                                          for p in self.piecesIndex) <= self.originalBoardSize,
+                              'RollSizeCt')
+
+    def generateObjective(self):
+        # Maximize de profit of the new pattern
+        self.model.setObjective(gb.quicksum(self.piecesInPatternVar[p] * self.duals[p]
+                                            for p in self.piecesIndex),
+                                sense=gb.GRB.MAXIMIZE)
+
+    def getNewPattern(self):
+        return self.model.getAttr("X", self.model.getVars())
+
+    def solveModel(self, timelimit=None, GAP=0.0):
+        self.model.setParam('TimeLimit', timelimit)
+        self.model.setParam('MIPGap', GAP)
+        self.model.optimize()
+
+    def getObjectiveValue(self):
+        obj = self.model.getObjective()
+        return obj.getValue()
+
+
+# =============================================================================
+
+# =============================================================================
+class InitialPatternsGenerator:
+    def __init__(self, nbItems):
+        columns = ['PatternCost', 'PatternFill']
+        patterns = pd.DataFrame(index=range(nbItems), columns=columns)
+        self.patternDf = patterns
+        self.nbItems = nbItems
+
+    # Original patterns: Use each raw only for i cutted roll, regardless the size
+    def generateBasicInitialPatterns(self):
+        self.patternDf['PatternCost'] = 1
+        self.patternDf['PatternFill'] = [np.where(self.patternDf.index == j, 1, 0)
+                                         for j in range(self.nbItems)]
+        return self.patternDf
+
+
+# =============================================================================
+
+
+# =============================================================================
+# Main
+# =============================================================================
+
+# Generate initial patterns
+# ----------------------------------------------------------------------------
+# initialize list of lists
+data = [[3, 25], [5, 20], [9, 15]]
+# Create the pandas DataFrame
+inputDf = pd.DataFrame(data, columns=['Size', 'Amount'])
+originalBoardSize = 17
+patternGenerator = InitialPatternsGenerator(len(inputDf))
+patternDf = patternGenerator.generateBasicInitialPatterns()
+# ----------------------------------------------------------------------------
+
+
+# Build Master problem with initial patterns
+# ----------------------------------------------------------------------------
+master = MasterProblem(patternDf, inputDf)
+master.buildModel()
+
+modelImprovable = True
+
+while modelImprovable:
+    # Solve relaxed Master
+    master.solveRelaxedModel()
+    duals = master.getDuals()
+
+    # Build Subproblem
+    subproblem = Subproblem(inputDf, originalBoardSize, duals)
+    subproblem.buildModel()
+    subproblem.solveModel(120, 0.5)
+
+    # Check if new pattern improves Master solution
+    modelImprovable = (subproblem.getObjectiveValue() - 1) > 0
+
+    # Add new generated pattern to master problem and iterate
+    newPatternCost = 1
+    newPatternCuts = subproblem.getNewPattern()
+    master.addColumn(newPatternCost, newPatternCuts)
+# ----------------------------------------------------------------------------
+
+
+# Solve the integer master problem with all the patterns introduced previously
+# ----------------------------------------------------------------------------
+master.solveModel(3600, 0.1)
+print('=========================================================')
+print("The size of the original boards is " + str(originalBoardSize) + ".")
+print('--------------------')
+print("Requeriments:")
+print(inputDf)
+print('--------------------')
+master.result()
+print('=========================================================')
+# ----------------------------------------------------------------------------
+
+# =============================================================================
+# =============================================================================
