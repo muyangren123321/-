@@ -1,0 +1,95 @@
+import random
+from readFile import *
+
+# 生成两个随机正整数
+random_int_1 = random.randint(0, 100)
+random_int_2 = random.randint(0, 100)
+
+# 定义参数L,表示板材的长度，
+L = 1000
+# 计算矩形的线性表示，并添加索引值
+linearized = {}
+summed = 0
+# 存储summed的总和
+total_summed = 0
+accumulated_sum = {}
+for i, (length, width) in rectangles.items():
+    while True:
+        # 使用了一个while循环来检查summed是否超过了L。如果超过了，我们将重新生成随机数，并使用新的随机数重新计算。
+        # 然后，我们将线性化表示的矩形尺寸存储在linearized变量中，并使用for循环输出。
+        multiplied_length = length * random_int_1
+        multiplied_width = width * random_int_2
+        summed = multiplied_length + multiplied_width  # 同形块规范尺寸
+        difference = abs(multiplied_length - multiplied_width)
+        if total_summed + summed > L:
+            random_int_1 = random.randint(1, 80)
+            random_int_2 = random.randint(1, 80)
+        else:
+            linearized[i] = (summed, difference)  # 同形级规范宽度尺寸
+            total_summed += summed
+            accumulated_sum[i] = total_summed  # 同形级规范长度尺寸，同形段规范长度等于同形段规范长度
+            # difference用以计算长度和宽度的差值
+            break
+linearized['L'] = (L, 0)
+accumulated_sum['L'] = L
+for i, (summed, difference) in linearized.items():
+    print(f"{i}: {summed}")
+    print(accumulated_sum[i])
+
+# # 生成两个随机正整数
+# random_int_3 = random.randint(1, 100)
+# random_int_4 = random.randint(1, 100)
+#
+#
+# # 计算矩形的线性表示，并添加索引值
+# linearized_2 = {}
+#
+# # 存储summed的总和
+# total_summed_2 = 0
+# accumulated_sum_2 = {}
+# for i, (length, width) in rectangles.items():
+#     while True:
+#         # 使用了一个while循环来检查summed是否超过了W。如果超过了，我们将重新生成随机数，并使用新的随机数重新计算。
+#         # 然后，我们将线性化表示的矩形尺寸存储在linear_rectangles变量中，并使用for循环输出。
+#         multiplied_length = length * random_int_3
+#         multiplied_width = width * random_int_4
+#         summed_2 = multiplied_length + multiplied_width  # 同形块规范宽度尺寸
+#         difference_2 = abs(multiplied_length - multiplied_width)
+#         if total_summed_2 + summed_2 > W:
+#             random_int_3 = random.randint(1, 10)
+#             random_int_4 = random.randint(1, 10)
+#         else:
+#             linearized_2[i] = (summed_2, difference_2)
+#             total_summed_2 += summed_2
+#             accumulated_sum_2[i] = total_summed_2  # 同形段规范宽度尺寸
+#             # difference用以计算长度和宽度的差值
+#             break
+#
+# # 输出每个矩形的线性表示
+# for i, (summed_2, difference_2) in linearized_2.items():
+#     print(f"{i}_2: {summed_2}")
+#     print(accumulated_sum_2[i])
+# # # 确保summed的总和不超过L
+# # while total_summed > L:
+# #     total_summed = 0
+# #     linear_rectangles = {}
+# #     r1 = random.randint(1, 10)
+# #     r2 = random.randint(1, 10)
+# #     for i, (length, width) in rectangles.items():
+# #         while True:
+# #             # 使用了一个while循环来检查summed是否超过了L。如果超过了，我们将重新生成随机数，并使用新的随机数重新计算。
+# #             # 然后，我们将线性化表示的矩形尺寸存储在linear_rectangles变量中，并使用for循环输出。
+# #             multiplied_length = length * random_int_1
+# #             multiplied_width = width * random_int_2
+# #             summed = multiplied_length + multiplied_width
+# #             difference = abs(multiplied_length - multiplied_width)
+# #             if total_summed + summed > L:
+# #                 random_int_1 = random.randint(1, 10)
+# #                 random_int_2 = random.randint(1, 10)
+# #             else:
+# #                 linearized[i] = (summed, difference)
+# #                 total_summed += summed
+# #                 # difference用以计算长度和宽度的差值
+# #                 break
+# # 输出确保summed总和不超过L的结果
+# print("Total summed:", total_summed_2)
